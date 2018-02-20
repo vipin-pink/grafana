@@ -28,6 +28,13 @@ export class DataProcessor {
           return this.timeSeriesHandler(item, index, options);
         });
       }
+      case 'non-series': {
+        let dataListNonSeries = this.processNonSeriesDataPoints(options);
+        options.dataList = dataListNonSeries;
+        return options.dataList.map((item, index) => {
+          return this.timeSeriesHandler(item, index, options);
+        });
+      }
       case 'histogram': {
         let histogramDataList = [
           {
@@ -55,6 +62,9 @@ export class DataProcessor {
         if (this.panel.xaxis.mode === 'series') {
           return 'series';
         }
+        if (this.panel.xaxis.mode === 'non-series') {
+          return 'non-series';
+        }
         if (this.panel.xaxis.mode === 'histogram') {
           return 'histogram';
         }
@@ -74,7 +84,8 @@ export class DataProcessor {
         this.panel.xaxis.values = [];
         break;
       }
-      case 'series': {
+      case 'series':
+      case 'non-series': {
         this.panel.bars = true;
         this.panel.lines = false;
         this.panel.points = false;
@@ -96,10 +107,33 @@ export class DataProcessor {
     }
   }
 
+  processNonSeriesDataPoints(options) {
+    let finalDataPoints = [];
+    let data = options.dataList;
+    _.maxBy(data, 'datapoints.length').datapoints.forEach((dataItem, index2) => {
+      var newDataPoints = [];
+      _.forEach(data, (item, index) => {
+        newDataPoints.push([
+          index + 1,
+          data[index] && data[index].datapoints && data[index].datapoints[index2]
+            ? data[index].datapoints[index2][0]
+            : 0,
+        ]);
+      });
+      finalDataPoints.push({
+        target: dataItem[1],
+        datapoints: {
+          nonTimeSeriesData: newDataPoints,
+          originalData: data,
+        },
+      });
+    });
+    return finalDataPoints;
+  }
+
   timeSeriesHandler(seriesData, index, options) {
     var datapoints = seriesData.datapoints || [];
     var alias = seriesData.target;
-
     var colorIndex = index % colors.length;
     var color = this.panel.aliasColors[alias] || colors[colorIndex];
 

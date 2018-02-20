@@ -29,6 +29,7 @@ export class AxesEditorCtrl {
       Time: 'time',
       Series: 'series',
       Histogram: 'histogram',
+      NonSeries: 'non-series',
       // 'Data field': 'field',
     };
 

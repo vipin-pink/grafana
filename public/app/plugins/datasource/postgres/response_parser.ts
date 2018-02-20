@@ -14,10 +14,13 @@ export default class ResponseParser {
       let queryRes = res.data.results[key];
 
       if (queryRes.series) {
-        for (let series of queryRes.series) {
+        var querySeries = queryRes.nontimeseries[0].points[0][1] === 'value' ? queryRes.series : queryRes.nontimeseries;
+        for (let series of querySeries) {
           data.push({
             target: series.name,
-            datapoints: series.points,
+            datapoints: _.each(series.points, function(val) {
+              val[0] = parseInt(val[0]);
+            }),
             refId: queryRes.refId,
             meta: queryRes.meta,
           });

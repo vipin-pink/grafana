@@ -53,9 +53,9 @@
 		</div>
 
 		<!-- Series mode -->
-		<div class="gf-form" ng-if="ctrl.panel.xaxis.mode === 'series'">
+		<div class="gf-form" ng-if="ctrl.panel.xaxis.mode === 'series' || ctrl.panel.xaxis.mode === 'non-series'">
 			<label class="gf-form-label width-6">Value</label>
-      <metric-segment-model property="ctrl.panel.xaxis.values[0]" options="ctrl.xAxisStatOptions" on-change="ctrl.xAxisValueChanged()" custom="false" css-class="width-10" select-mode="true"></metric-segment-model>
+      		<metric-segment-model property="ctrl.panel.xaxis.values[0]" options="ctrl.xAxisStatOptions" on-change="ctrl.xAxisValueChanged()" custom="false" css-class="width-10" select-mode="true"></metric-segment-model>
 		</div>
 
 		<!-- Histogram mode -->

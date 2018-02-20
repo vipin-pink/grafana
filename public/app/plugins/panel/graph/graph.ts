@@ -225,13 +225,22 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           case 'series': {
             options.series.bars.barWidth = 0.7;
             options.series.bars.align = 'center';
-
             for (let i = 0; i < data.length; i++) {
               let series = data[i];
               series.data = [[i + 1, series.stats[panel.xaxis.values[0]]]];
             }
 
             addXSeriesAxis(options);
+            break;
+          }
+          case 'non-series': {
+            options.series.bars.barWidth = 0.7;
+            options.series.bars.align = 'center';
+            for (let i = 0; i < data.length; i++) {
+              let series = data[i];
+              series.data = data[i].datapoints.nonTimeSeriesData; // [[i + 1, series.stats[panel.xaxis.values[0]]]];
+            }
+            addXSeriesAxis(options, data[0].datapoints.originalData);
             break;
           }
           case 'histogram': {
@@ -392,11 +401,10 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         };
       }
 
-      function addXSeriesAxis(options) {
-        var ticks = _.map(data, function(series, index) {
-          return [index + 1, series.alias];
+      function addXSeriesAxis(options, nonTimeSeriesData = false) {
+        var ticks = _.map(nonTimeSeriesData ? nonTimeSeriesData : data, function(series, index) {
+          return [index + 1, nonTimeSeriesData ? series.target : series.alias];
         });
-
         options.xaxis = {
           timezone: dashboard.getTimezone(),
           show: panel.xaxis.show,
