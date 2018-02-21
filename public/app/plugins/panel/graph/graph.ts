@@ -33,6 +33,8 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
       var data;
       var plot;
       var sortedSeries;
+      var filteredView = false;
+      var filteredAlias;
       var panelWidth = 0;
       var eventManager = new EventManager(ctrl);
       var thresholdManager = new ThresholdManager(ctrl);
@@ -64,7 +66,6 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         annotations = ctrl.annotations || [];
         buildFlotPairs(data);
         updateLegendValues(data, panel);
-
         ctrl.events.emit('render-legend');
       });
 
@@ -236,11 +237,19 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
           case 'non-series': {
             options.series.bars.barWidth = 0.7;
             options.series.bars.align = 'center';
+            filteredView = false;
             for (let i = 0; i < data.length; i++) {
               let series = data[i];
               series.data = data[i].datapoints.nonTimeSeriesData; // [[i + 1, series.stats[panel.xaxis.values[0]]]];
+              // if hidden remove points and disable stack
+              if (ctrl.hiddenSeries[series.alias]) {
+                filteredView = true;
+              }
+              if (filteredView && !ctrl.hiddenSeries[series.alias]) {
+                filteredAlias = series.alias;
+              }
             }
-            addXSeriesAxis(options, data[0].datapoints.originalData);
+            addXSeriesAxis(options, data.length ? data[0].datapoints.originalData : false);
             break;
           }
           case 'histogram': {
@@ -369,6 +378,16 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         var shouldSortBy = panel.stack && haveSortBy && haveSortOrder;
         var sortDesc = panel.legend.sortDesc === true ? -1 : 1;
 
+        if (filteredView && panel.xaxis.mode === 'non-series') {
+          let columnRelation = _.keys(
+            _.keyBy(_.values(_.maxBy(series[0].datapoints.originalData, 'datapoints.length').datapoints), 1)
+          );
+          _.each(series, (value, index) => {
+            if (index !== columnRelation.indexOf(filteredAlias)) {
+              series[index].data = [];
+            }
+          });
+        }
         if (shouldSortBy) {
           return _.sortBy(series, s => s.stats[sortBy] * sortDesc);
         } else {

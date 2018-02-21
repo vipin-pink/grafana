@@ -251,7 +251,6 @@ class GraphCtrl extends MetricsPanelCtrl {
 
   toggleSeriesExclusiveMode(serie) {
     var hidden = this.hiddenSeries;
-
     if (hidden[serie.alias]) {
       delete hidden[serie.alias];
     }

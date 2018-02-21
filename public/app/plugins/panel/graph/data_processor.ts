@@ -107,18 +107,40 @@ export class DataProcessor {
     }
   }
 
+  fillNonSeriesData(nonSeriesData, columnRelation, length) {
+    let newArray = [];
+    var indexes = [];
+    _.each(nonSeriesData, (value, index) => {
+      var newIndex = _.indexOf(columnRelation, value[1]).toString();
+      indexes[newIndex] = value;
+    });
+    _.each(Array(length), (value, index) => {
+      if (indexes[index] && indexes[index].length === 2) {
+        newArray.push(indexes[index]);
+      } else {
+        newArray.push([0, columnRelation[index]]);
+      }
+    });
+    return newArray;
+  }
+
   processNonSeriesDataPoints(options) {
     let finalDataPoints = [];
     let data = options.dataList;
+    let maxDataLength = _.maxBy(data, 'datapoints.length').datapoints.length;
+    let columnRelation = _.keys(_.keyBy(_.values(_.maxBy(data, 'datapoints.length').datapoints), 1));
     _.maxBy(data, 'datapoints.length').datapoints.forEach((dataItem, index2) => {
       var newDataPoints = [];
       _.forEach(data, (item, index) => {
-        newDataPoints.push([
-          index + 1,
+        data[index].datapoints =
+          data[index].datapoints.length !== maxDataLength && data[index].datapoints && data[index].datapoints[index2]
+            ? this.fillNonSeriesData(data[index].datapoints, columnRelation, maxDataLength)
+            : data[index].datapoints;
+        let newDataPointVal =
           data[index] && data[index].datapoints && data[index].datapoints[index2]
             ? data[index].datapoints[index2][0]
-            : 0,
-        ]);
+            : 0;
+        newDataPoints.push([index + 1, newDataPointVal]);
       });
       finalDataPoints.push({
         target: dataItem[1],
