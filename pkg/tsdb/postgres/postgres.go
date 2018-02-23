@@ -140,7 +140,9 @@ func (e PostgresQueryEndpoint) getTypedRowData(rows *core.Rows) (tsdb.RowValues,
 
 func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *core.Rows, result *tsdb.QueryResult) error {
 	pointsBySeries := make(map[string]*tsdb.TimeSeries)
+	pointsByNonTimeSeries := make(map[string]*tsdb.NonTimeSeries)
 	seriesByQueryOrder := list.New()
+	nonTimeSeriesByQueryOrder := list.New()
 	columnNames, err := rows.Columns()
 
 	if err != nil {
@@ -151,6 +153,7 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 	rowCount := 0
 	timeIndex := -1
 	metricIndex := -1
+	nonTimeSeriesIndex := -1
 
 	// check columns of resultset
 	for i, col := range columnNames {
@@ -159,6 +162,8 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 			timeIndex = i
 		case "metric":
 			metricIndex = i
+		case "stringvalue":
+			nonTimeSeriesIndex = i
 		}
 	}
 
@@ -170,6 +175,7 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 		var timestamp float64
 		var value null.Float
 		var metric string
+		var nonTimeSeriesValue string
 
 		if rowCount > rowLimit {
 			return fmt.Errorf("PostgreSQL query row limit exceeded, limit %d", rowLimit)
@@ -199,8 +205,16 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 			}
 		}
 
+		if nonTimeSeriesIndex >= 0 {
+			if columnValue, ok := values[nonTimeSeriesIndex].(string); ok == true {
+				nonTimeSeriesValue = columnValue
+			} else {
+				return fmt.Errorf("Column metric must be of type char,varchar or text")
+			}
+		}
+
 		for i, col := range columnNames {
-			if i == timeIndex || i == metricIndex {
+			if i == timeIndex || i == metricIndex || i == nonTimeSeriesIndex {
 				continue
 			}
 
@@ -217,7 +231,11 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 			if metricIndex == -1 {
 				metric = col
 			}
+			if nonTimeSeriesIndex == -1 {
+				nonTimeSeriesValue = col
+			}
 			e.appendTimePoint(pointsBySeries, seriesByQueryOrder, metric, timestamp, value)
+			e.appendStringPoint(pointsByNonTimeSeries, nonTimeSeriesByQueryOrder, metric, nonTimeSeriesValue, value)
 			rowCount++
 
 		}
@@ -226,6 +244,7 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 	for elem := seriesByQueryOrder.Front(); elem != nil; elem = elem.Next() {
 		key := elem.Value.(string)
 		result.Series = append(result.Series, pointsBySeries[key])
+		result.NonTimeSeries = append(result.NonTimeSeries, pointsByNonTimeSeries[key])
 	}
 
 	result.Meta.Set("rowCount", rowCount)
@@ -242,4 +261,16 @@ func (e PostgresQueryEndpoint) appendTimePoint(pointsBySeries map[string]*tsdb.T
 		seriesByQueryOrder.PushBack(metric)
 	}
 	e.log.Debug("Rows", "metric", metric, "time", timestamp, "value", value)
+}
+
+func (e PostgresQueryEndpoint) appendStringPoint(pointsByNonTimeSeries map[string]*tsdb.NonTimeSeries, nonTimeSeriesByQueryOrder *list.List, metric string, nonTimeSeriesValue string, value null.Float) {
+	if nonTimeSeries, exist := pointsByNonTimeSeries[metric]; exist {
+		nonTimeSeries.Points = append(nonTimeSeries.Points, tsdb.TimePointString{fmt.Sprint(value), nonTimeSeriesValue})
+	} else {
+		nonTimeSeries := &tsdb.NonTimeSeries{Name: metric}
+		nonTimeSeries.Points = append(nonTimeSeries.Points, tsdb.TimePointString{fmt.Sprint(value), nonTimeSeriesValue})
+		pointsByNonTimeSeries[metric] = nonTimeSeries
+		nonTimeSeriesByQueryOrder.PushBack(metric)
+	}
+	e.log.Debug("Rows", "metric", metric, "nonTimeSeriesValue", nonTimeSeriesValue, "value", value)
 }

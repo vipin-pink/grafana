@@ -34,6 +34,8 @@ function graphDirective($rootScope, timeSrv, popoverSrv, contextSrv) {
       var data;
       var plot;
       var sortedSeries;
+      var filteredView = false;
+      var filteredAlias;
       var legendSideLastValue = null;
       var rootScope = scope.$root;
       var panelWidth = 0;
@@ -303,6 +305,24 @@ function graphDirective($rootScope, timeSrv, popoverSrv, contextSrv) {
             addXSeriesAxis(options);
             break;
           }
+          case 'non-series': {
+            options.series.bars.barWidth = 0.7;
+            options.series.bars.align = 'center';
+            filteredView = false;
+            for (let i = 0; i < data.length; i++) {
+              let series = data[i];
+              series.data = data[i].datapoints.nonTimeSeriesData; // [[i + 1, series.stats[panel.xaxis.values[0]]]];
+              // if hidden remove points and disable stack
+              if (ctrl.hiddenSeries[series.alias]) {
+                filteredView = true;
+              }
+              if (filteredView && !ctrl.hiddenSeries[series.alias]) {
+                filteredAlias = series.alias;
+              }
+            }
+            addXSeriesAxis(options, data.length ? data[0].datapoints.originalData : false);
+            break;
+          }
           case 'histogram': {
             let bucketSize: number;
             let values = getSeriesValues(data);
@@ -344,7 +364,16 @@ function graphDirective($rootScope, timeSrv, popoverSrv, contextSrv) {
         configureAxisOptions(data, options);
 
         sortedSeries = _.sortBy(data, function(series) { return series.zindex; });
-
+        if (filteredView && panel.xaxis.mode === 'non-series') {
+          let columnRelation = _.keys(
+            _.keyBy(_.values(_.maxBy(sortedSeries[0].datapoints.originalData, 'datapoints.length').datapoints), 1)
+          );
+          _.each(sortedSeries, (value, index) => {
+            if (index !== columnRelation.indexOf(filteredAlias)) {
+              sortedSeries[index].data = [];
+            }
+          });
+        }
         function callPlot(incrementRenderCounter) {
           try {
             plot = $.plot(elem, sortedSeries, options);
@@ -409,9 +438,9 @@ function graphDirective($rootScope, timeSrv, popoverSrv, contextSrv) {
         };
       }
 
-      function addXSeriesAxis(options) {
-        var ticks = _.map(data, function(series, index) {
-          return [index + 1, series.alias];
+      function addXSeriesAxis(options, nonTimeSeriesData = false) {
+        var ticks = _.map(nonTimeSeriesData ? nonTimeSeriesData : data, function(series, index) {
+          return [index + 1, nonTimeSeriesData ? series.target : series.alias];
         });
 
         options.xaxis = {

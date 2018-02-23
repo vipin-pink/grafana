@@ -27,18 +27,25 @@ type Response struct {
 }
 
 type QueryResult struct {
-	Error       error            `json:"-"`
-	ErrorString string           `json:"error,omitempty"`
-	RefId       string           `json:"refId"`
-	Meta        *simplejson.Json `json:"meta,omitempty"`
-	Series      TimeSeriesSlice  `json:"series"`
-	Tables      []*Table         `json:"tables"`
+	Error         error              `json:"-"`
+	ErrorString   string             `json:"error,omitempty"`
+	RefId         string             `json:"refId"`
+	Meta          *simplejson.Json   `json:"meta,omitempty"`
+	Series        TimeSeriesSlice    `json:"series"`
+	NonTimeSeries NonTimeSeriesSlice `json:"nontimeseries"`
+	Tables        []*Table           `json:"tables"`
 }
 
 type TimeSeries struct {
 	Name   string            `json:"name"`
 	Points TimeSeriesPoints  `json:"points"`
 	Tags   map[string]string `json:"tags,omitempty"`
+}
+
+type NonTimeSeries struct {
+	Name   string              `json:"name"`
+	Points NonTimeSeriesPoints `json:"points"`
+	Tags   map[string]string   `json:"tags,omitempty"`
 }
 
 type Table struct {
@@ -54,6 +61,9 @@ type RowValues []interface{}
 type TimePoint [2]null.Float
 type TimeSeriesPoints []TimePoint
 type TimeSeriesSlice []*TimeSeries
+type TimePointString [2]string
+type NonTimeSeriesPoints []TimePointString
+type NonTimeSeriesSlice []*NonTimeSeries
 
 func NewQueryResult() *QueryResult {
 	return &QueryResult{

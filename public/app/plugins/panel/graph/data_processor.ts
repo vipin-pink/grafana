@@ -33,6 +33,13 @@ export class DataProcessor {
           return this.timeSeriesHandler(item, index, options);
         });
       }
+      case 'non-series': {
+        let dataListNonSeries = this.processNonSeriesDataPoints(options);
+        options.dataList = dataListNonSeries;
+        return options.dataList.map((item, index) => {
+          return this.timeSeriesHandler(item, index, options);
+        });
+      }
       case 'field': {
         return this.customHandler(firstItem);
       }
@@ -46,6 +53,9 @@ export class DataProcessor {
       default: {
         if (this.panel.xaxis.mode === 'series') {
           return 'series';
+        }
+        if (this.panel.xaxis.mode === 'non-series') {
+          return 'non-series';
         }
         if (this.panel.xaxis.mode === 'histogram') {
           return 'histogram';
@@ -66,7 +76,8 @@ export class DataProcessor {
         this.panel.xaxis.values = [];
         break;
       }
-      case 'series': {
+      case 'series':
+      case 'non-series': {
         this.panel.bars = true;
         this.panel.lines = false;
         this.panel.points = false;
@@ -86,6 +97,50 @@ export class DataProcessor {
         break;
       }
     }
+  }
+
+  fillNonSeriesData(nonSeriesData, columnRelation, length) {
+    let newArray = [];
+    var indexes = [];
+    _.each(nonSeriesData, (value, index) => {
+      var newIndex = _.indexOf(columnRelation, value[1]).toString();
+      indexes[newIndex] = value;
+    });
+    _.each(Array(length), (value, index) => {
+      if (indexes[index] && indexes[index].length === 2) {
+        newArray.push(indexes[index]);
+      } else {
+        newArray.push([0, columnRelation[index]]);
+      }
+    });
+    return newArray;
+  }
+
+  processNonSeriesDataPoints(options) {
+    let finalDataPoints = [];
+    let data = options.dataList;
+    let maxDataLength = _.maxBy(data, 'datapoints.length').datapoints.length;
+    let columnRelation = _.keys(_.keyBy(_.values(_.maxBy(data, 'datapoints.length').datapoints), 1));
+    _.maxBy(data, 'datapoints.length').datapoints.forEach((dataItem, index2) => {
+      var newDataPoints = [];
+      _.forEach(data, (item, index) => {
+        data[index].datapoints =
+        data[index].datapoints.length !== maxDataLength && data[index].datapoints && data[index].datapoints[index2]
+          ? this.fillNonSeriesData(data[index].datapoints, columnRelation, maxDataLength)
+          : data[index].datapoints;
+        let newDataPointVal = data[index] && data[index].datapoints && data[index].datapoints[index2]
+        ? data[index].datapoints[index2][0] : 0;
+        newDataPoints.push([index + 1, newDataPointVal]);
+      });
+      finalDataPoints.push({
+        target: dataItem[1],
+        datapoints: {
+          nonTimeSeriesData: newDataPoints,
+          originalData: data,
+        },
+      });
+    });
+    return finalDataPoints;
   }
 
   timeSeriesHandler(seriesData, index, options) {
