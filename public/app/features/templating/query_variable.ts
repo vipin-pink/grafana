@@ -20,6 +20,7 @@ export class QueryVariable implements Variable {
   name: string;
   multi: boolean;
   includeAll: boolean;
+  disableWrapWithQuotes: boolean;
   useTags: boolean;
   tagsQuery: string;
   tagValuesQuery: string;
@@ -37,6 +38,7 @@ export class QueryVariable implements Variable {
     name: '',
     multi: false,
     includeAll: false,
+    disableWrapWithQuotes: false,
     allValue: null,
     options: [],
     current: {},

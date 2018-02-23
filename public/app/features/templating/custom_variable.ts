@@ -7,6 +7,7 @@ export class CustomVariable implements Variable {
   query: string;
   options: any;
   includeAll: boolean;
+  disableWrapWithQuotes: boolean;
   multi: boolean;
   current: any;
 
@@ -19,6 +20,7 @@ export class CustomVariable implements Variable {
     current: {},
     query: '',
     includeAll: false,
+    disableWrapWithQuotes: false,
     multi: false,
     allValue: null,
   };
