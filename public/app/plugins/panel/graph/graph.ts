@@ -6,6 +6,7 @@ import 'vendor/flot/jquery.flot.stackpercent';
 import 'vendor/flot/jquery.flot.fillbelow';
 import 'vendor/flot/jquery.flot.crosshair';
 import 'vendor/flot/jquery.flot.dashes';
+import 'vendor/flot/jquery.flot.orderbars';
 import './jquery.flot.events';
 
 import $ from 'jquery';
@@ -41,6 +42,7 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
       var tooltip = new GraphTooltip(elem, dashboard, scope, function() {
         return sortedSeries;
       });
+      var minTimeStepOfSeries = 0;
 
       // panel events
       ctrl.events.on('panel-teardown', () => {
@@ -112,6 +114,20 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         }
 
         return false;
+      }
+
+      function displaySideBySide(sortedSeries, options) {
+        let barsSeries = _.filter(sortedSeries, series => series.bars && series.bars.show !== false);
+        let barWidth = minTimeStepOfSeries / 1.5 / barsSeries.length;
+        for (let i = 0; i < barsSeries.length; i++) {
+          let series = sortedSeries[i];
+          series.bars.order = i + 1;
+          series.bars.barWidth = barWidth;
+        }
+      }
+
+      function shouldDisplaySideBySide() {
+        return panel.sideBySide && !panel.stack && panel.xaxis.mode === 'time';
       }
 
       function drawHook(plot) {
@@ -205,6 +221,11 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
         eventManager.addFlotEvents(annotations, options);
 
         sortedSeries = sortSeries(data, panel);
+
+        if (shouldDisplaySideBySide()) {
+          displaySideBySide(sortedSeries, options);
+        }
+
         callPlot(options, true);
       }
 
@@ -278,7 +299,8 @@ function graphDirective(timeSrv, popoverSrv, contextSrv) {
             break;
           }
           default: {
-            options.series.bars.barWidth = getMinTimeStepOfSeries(data) / 1.5;
+            minTimeStepOfSeries = getMinTimeStepOfSeries(data);
+            options.series.bars.barWidth = minTimeStepOfSeries / 1.5;
             addTimeAxis(options);
             break;
           }
