@@ -30,6 +30,7 @@ System.config({
     "jquery.flot.time": "vendor/flot/jquery.flot.time",
     "jquery.flot.crosshair": "vendor/flot/jquery.flot.crosshair",
     "jquery.flot.fillbelow": "vendor/flot/jquery.flot.fillbelow",
+    "jquery.flot.orderbars": "vendor/flot/jquery.flot.orderbars",
     "jquery.flot.gauge": "vendor/flot/jquery.flot.gauge",
     "d3": "vendor/d3/d3.js",
     "jquery.flot.dashes": "vendor/flot/jquery.flot.dashes",
