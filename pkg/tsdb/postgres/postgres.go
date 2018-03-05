@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"math"
 	"net/url"
 	"strconv"
 	"time"
@@ -204,18 +203,6 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 		return fmt.Errorf("Found no column named time")
 	}
 
-	fillMissing := query.Model.Get("fill").MustBool(false)
-	var fillInterval float64
-	fillValue := null.Float{}
-	if fillMissing {
-		fillInterval = query.Model.Get("fillInterval").MustFloat64() * 1000
-		if query.Model.Get("fillNull").MustBool(false) == false {
-			fillValue.Float64 = query.Model.Get("fillValue").MustFloat64()
-			fillValue.Valid = true
-		}
-
-	}
-
 	for rows.Next() {
 		var timestamp float64
 		var value null.Float
@@ -276,45 +263,11 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 			if metricIndex == -1 {
 				metric = col
 			}
-
 			if nonTimeSeriesIndex == -1 {
 				nonTimeSeriesValue = col
 			}
-
-			series, exist := pointsBySeries[metric]
-			nonTimeSeries, exist := pointsByNonTimeSeries[metric]
-
-			if exist == false {
-				series = &tsdb.TimeSeries{Name: metric}
-				pointsBySeries[metric] = series
-				seriesByQueryOrder.PushBack(metric)
-
-				nonTimeSeries := &tsdb.NonTimeSeries{Name: metric}
-				pointsByNonTimeSeries[metric] = nonTimeSeries
-				nonTimeSeriesByQueryOrder.PushBack(metric)
-			}
-
-			if fillMissing {
-				var intervalStart float64
-				if exist == false {
-					intervalStart = float64(tsdbQuery.TimeRange.MustGetFrom().UnixNano() / 1e6)
-				} else {
-					intervalStart = series.Points[len(series.Points)-1][1].Float64 + fillInterval
-				}
-
-				// align interval start
-				intervalStart = math.Floor(intervalStart/fillInterval) * fillInterval
-
-				for i := intervalStart; i < timestamp; i += fillInterval {
-					series.Points = append(series.Points, tsdb.TimePoint{fillValue, null.FloatFrom(i)})
-					rowCount++
-				}
-			}
-
-			series.Points = append(series.Points, tsdb.TimePoint{value, null.FloatFrom(timestamp)})
-			nonTimeSeries.Points = append(nonTimeSeries.Points, tsdb.TimePointString{fmt.Sprint(value), nonTimeSeriesValue})
-
-			e.log.Debug("Rows", "metric", metric, "time", timestamp, "value", value)
+			e.appendTimePoint(pointsBySeries, seriesByQueryOrder, metric, timestamp, value)
+			e.appendStringPoint(pointsByNonTimeSeries, nonTimeSeriesByQueryOrder, metric, nonTimeSeriesValue, value)
 			rowCount++
 
 		}
@@ -324,22 +277,32 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 		key := elem.Value.(string)
 		result.Series = append(result.Series, pointsBySeries[key])
 		result.NonTimeSeries = append(result.NonTimeSeries, pointsByNonTimeSeries[key])
-
-		if fillMissing {
-			series := pointsBySeries[key]
-			// fill in values from last fetched value till interval end
-			intervalStart := series.Points[len(series.Points)-1][1].Float64
-			intervalEnd := float64(tsdbQuery.TimeRange.MustGetTo().UnixNano() / 1e6)
-
-			// align interval start
-			intervalStart = math.Floor(intervalStart/fillInterval) * fillInterval
-			for i := intervalStart + fillInterval; i < intervalEnd; i += fillInterval {
-				series.Points = append(series.Points, tsdb.TimePoint{fillValue, null.FloatFrom(i)})
-				rowCount++
-			}
-		}
 	}
 
 	result.Meta.Set("rowCount", rowCount)
 	return nil
+}
+
+func (e PostgresQueryEndpoint) appendTimePoint(pointsBySeries map[string]*tsdb.TimeSeries, seriesByQueryOrder *list.List, metric string, timestamp float64, value null.Float) {
+	if series, exist := pointsBySeries[metric]; exist {
+		series.Points = append(series.Points, tsdb.TimePoint{value, null.FloatFrom(timestamp)})
+	} else {
+		series := &tsdb.TimeSeries{Name: metric}
+		series.Points = append(series.Points, tsdb.TimePoint{value, null.FloatFrom(timestamp)})
+		pointsBySeries[metric] = series
+		seriesByQueryOrder.PushBack(metric)
+	}
+	e.log.Debug("Rows", "metric", metric, "time", timestamp, "value", value)
+}
+
+func (e PostgresQueryEndpoint) appendStringPoint(pointsByNonTimeSeries map[string]*tsdb.NonTimeSeries, nonTimeSeriesByQueryOrder *list.List, metric string, nonTimeSeriesValue string, value null.Float) {
+	if nonTimeSeries, exist := pointsByNonTimeSeries[metric]; exist {
+		nonTimeSeries.Points = append(nonTimeSeries.Points, tsdb.TimePointString{fmt.Sprint(value), nonTimeSeriesValue})
+	} else {
+		nonTimeSeries := &tsdb.NonTimeSeries{Name: metric}
+		nonTimeSeries.Points = append(nonTimeSeries.Points, tsdb.TimePointString{fmt.Sprint(value), nonTimeSeriesValue})
+		pointsByNonTimeSeries[metric] = nonTimeSeries
+		nonTimeSeriesByQueryOrder.PushBack(metric)
+	}
+	e.log.Debug("Rows", "metric", metric, "nonTimeSeriesValue", nonTimeSeriesValue, "value", value)
 }
