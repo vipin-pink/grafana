@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -51,8 +52,8 @@ func generateConnectionString(datasource *models.DataSource) string {
 		}
 	}
 
-	sslmode := datasource.JsonData.Get("sslmode").MustString("require")
-	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s", datasource.User, password, datasource.Url, datasource.Database, sslmode)
+	sslmode := datasource.JsonData.Get("sslmode").MustString("verify-full")
+	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s", url.PathEscape(datasource.User), url.PathEscape(password), url.PathEscape(datasource.Url), url.PathEscape(datasource.Database), url.QueryEscape(sslmode))
 }
 
 func (e *PostgresQueryEndpoint) Query(ctx context.Context, dsInfo *models.DataSource, tsdbQuery *tsdb.TsdbQuery) (*tsdb.Response, error) {
@@ -77,6 +78,15 @@ func (e PostgresQueryEndpoint) transformToTable(query *tsdb.Query, rows *core.Ro
 
 	rowLimit := 1000000
 	rowCount := 0
+	timeIndex := -1
+
+	// check if there is a column named time
+	for i, col := range columnNames {
+		switch col {
+		case "time":
+			timeIndex = i
+		}
+	}
 
 	for ; rows.Next(); rowCount++ {
 		if rowCount > rowLimit {
@@ -86,6 +96,15 @@ func (e PostgresQueryEndpoint) transformToTable(query *tsdb.Query, rows *core.Ro
 		values, err := e.getTypedRowData(rows)
 		if err != nil {
 			return err
+		}
+
+		// convert column named time to unix timestamp to make
+		// native datetime postgres types work in annotation queries
+		if timeIndex != -1 {
+			switch value := values[timeIndex].(type) {
+			case time.Time:
+				values[timeIndex] = float64(value.UnixNano() / 1e9)
+			}
 		}
 
 		table.Rows = append(table.Rows, values)
@@ -143,8 +162,13 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 	pointsByNonTimeSeries := make(map[string]*tsdb.NonTimeSeries)
 	seriesByQueryOrder := list.New()
 	nonTimeSeriesByQueryOrder := list.New()
-	columnNames, err := rows.Columns()
 
+	columnNames, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
 		return err
 	}
@@ -155,7 +179,8 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 	metricIndex := -1
 	nonTimeSeriesIndex := -1
 
-	// check columns of resultset
+	// check columns of resultset: a column named time is mandatory
+	// the first text column is treated as metric name unless a column named metric is present
 	for i, col := range columnNames {
 		switch col {
 		case "time":
@@ -164,6 +189,13 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 			metricIndex = i
 		case "stringvalue":
 			nonTimeSeriesIndex = i
+		default:
+			if metricIndex == -1 {
+				switch columnTypes[i].DatabaseTypeName() {
+				case "UNKNOWN", "TEXT", "VARCHAR", "CHAR":
+					metricIndex = i
+				}
+			}
 		}
 	}
 
@@ -192,16 +224,16 @@ func (e PostgresQueryEndpoint) transformToTimeSeries(query *tsdb.Query, rows *co
 		case float64:
 			timestamp = columnValue * 1000
 		case time.Time:
-			timestamp = float64(columnValue.Unix() * 1000)
+			timestamp = float64(columnValue.UnixNano() / 1e6)
 		default:
-			return fmt.Errorf("Invalid type for column time, must be of type timestamp or unix timestamp")
+			return fmt.Errorf("Invalid type for column time, must be of type timestamp or unix timestamp, got: %T %v", columnValue, columnValue)
 		}
 
 		if metricIndex >= 0 {
 			if columnValue, ok := values[metricIndex].(string); ok == true {
 				metric = columnValue
 			} else {
-				return fmt.Errorf("Column metric must be of type char,varchar or text")
+				return fmt.Errorf("Column metric must be of type char,varchar or text, got: %T %v", values[metricIndex], values[metricIndex])
 			}
 		}
 
