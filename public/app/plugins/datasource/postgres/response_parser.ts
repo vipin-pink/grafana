@@ -14,9 +14,9 @@ export default class ResponseParser {
       let queryRes = res.data.results[key];
 
       if (queryRes.series) {
-        var querySeries = queryRes.nontimeseries[0].points[0][1] === 'value' ? queryRes.series : queryRes.nontimeseries;
+        var querySeries = queryRes.nontimeseries ? queryRes.nontimeseries : queryRes.series;
         for (let series of querySeries) {
-          if (queryRes.nontimeseries[0].points[0][1] !== 'value') {
+          if (queryRes.nontimeseries) {
             series.points = _.each(series.points, function(val) {
               val[0] = parseInt(val[0]);
             });
