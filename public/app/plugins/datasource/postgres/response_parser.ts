@@ -16,13 +16,13 @@ export default class ResponseParser {
       let queryRes = res.data.results[key];
 
       if (queryRes.series) {
-        var querySeries = queryRes.nontimeseries[0].points[0][1] === 'value' ? queryRes.series : queryRes.nontimeseries;
-        for (let series of querySeries) {
-          if (queryRes.nontimeseries[0].points[0][1] !== 'value') {
-            series.points = _.each(series.points, function(val) {
-              val[0] = parseInt(val[0]);
-            });
-          }
+        // var querySeries = queryRes.nontimeseries[0].points[0][1] === 'value' ? queryRes.series : queryRes.nontimeseries;
+        for (let series of queryRes.series) {
+          // if (queryRes.nontimeseries[0].points[0][1] !== 'value') {
+          //   series.points = _.each(series.points, function(val) {
+          //     val[0] = parseInt(val[0]);
+          //   });
+          // }
           data.push({
             target: series.name,
             datapoints: series.points,
