@@ -1,4 +1,4 @@
-<div class="navbar">
+<div class="navbar" ng-hide="ctrl.navHide">
 	<div class="navbar-inner">
 		<a class="navbar-brand-btn pointer" ng-click="ctrl.toggleSideMenu()">
 			<span class="navbar-brand-btn-background">
@@ -12,7 +12,7 @@
 		<div class="navbar-section-wrapper">
 			<a class="navbar-page-btn" ng-click="ctrl.showSearch()">
 				<i class="icon-gf icon-gf-dashboard"></i>
-				{{ctrl.dashboard.title}}
+					{{ctrl.dashboard.title}}
 				<i class="fa fa-caret-down"></i>
 			</a>
 		</div>

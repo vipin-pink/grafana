@@ -50,7 +50,6 @@ if(!_.isUndefined(ARGS.name)) {
 }
 
 for (var i = 0; i < rows; i++) {
-
   dashboard.rows.push({
     title: 'Chart',
     height: '300px',

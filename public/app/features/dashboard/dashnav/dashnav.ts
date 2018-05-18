@@ -10,6 +10,7 @@ export class DashNavCtrl {
   dashboard: DashboardModel;
   navModel: NavModel;
   titleTooltip: string;
+  navHide: boolean;
 
   /** @ngInject */
   constructor(
@@ -33,6 +34,8 @@ export class DashNavCtrl {
           this.titleTooltip += '<br>Expires: &nbsp;' + moment(meta.expires).fromNow() + '<br>';
         }
       }
+
+      this.hideNavigation();
     }
 
     toggleSideMenu() {
@@ -58,6 +61,10 @@ export class DashNavCtrl {
       this.backendSrv.post('/api/user/stars/dashboard/' + this.dashboard.id).then(() => {
         this.dashboard.meta.isStarred = true;
       });
+    }
+
+    hideNavigation() {
+      return (window.location.search.substring(1).indexOf('navHide') === -1) ? (this.navHide = false) : (this.navHide = true);
     }
 
     shareDashboard(tabIndex) {

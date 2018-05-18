@@ -63,7 +63,7 @@ function (angular, moment, _, $, kbn, dateMath, impressionStore) {
 
       return $http({ url: url, method: "GET" })
       .then(this._executeScript).then(function(result) {
-        return { meta: { fromScript: true, canDelete: false, canSave: false, canStar: false}, dashboard: result.data };
+        return { meta: { fromScript: true, canEdit: !(window.location.search.substring(1).indexOf('editable') === -1), canDelete: false, canSave: false, canStar: false}, dashboard: result.data };
       }, function(err) {
         console.log('Script dashboard error '+ err);
         $rootScope.appEvent('alert-error', ["Script Error", "Please make sure it exists and returns a valid dashboard"]);
